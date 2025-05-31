@@ -16,23 +16,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetching tags
-        run: git fetch --tags -f || true
-
       - name: Setup Node
         uses: actions/setup-node@v3.6.0
         with:
           node-version: 20.x
-          registry-url: "https://registry.npmjs.org"
+          registry-url: "https://registry.npmjs.org/"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Get yarn cache directory path
+      - name: Get Yarn Cache Dir
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
 
       - uses: actions/cache@v3
-        id: yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
+        id: yarn-cache
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -44,34 +41,38 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish in NPM (as `baileys`)
+      - name: Publish to NPM
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
-      - name: Publish in NPM (whiskeysockets scope)
+
+      # Optional: publish to another scoped package (ex: @whiskeysockets)
+      - name: Publish to @whiskeysockets/baileys
         run: |
+          originalName=$(node -p "require('./package.json').name")
           npx json -I -f package.json -e "this.name='@whiskeysockets/baileys'"
-          npm publish --access public --//registry.npmjs.org/:_authToken=$NPM_TOKEN
-          npx json -I -f package.json -e "this.name='baileys'"
+          npm publish --access public
+          npx json -I -f package.json -e "this.name='${originalName}'"
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Generate Changelog
         id: generate_changelog
         run: |
-          changelog=$(npm run changelog:last --silent)
+          changelog=$(npm run changelog:last --silent || echo "No changelog.")
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "${changelog}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Make Package
+      - name: Make NPM Pack
         run: npm pack
 
-      - name: Rename Pack
-        run: mv *.tgz baileys.tgz
+      - name: Rename Pack File
+        run: |
+          PACK_NAME=$(ls *.tgz | head -n1)
+          mv "$PACK_NAME" baileys.tgz
 
-      - name: Create Release
+      - name: Create GitHub Release
         uses: meeDamian/github-release@2.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
