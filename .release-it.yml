@@ -3,12 +3,11 @@ git:
   tagAnnotation: "chore(release): v${version}"
   tagName: "v${version}"
 
+npm:
+  publish: true
+  private: false
+  registry: "https://registry.npmjs.org/"
+
 hooks:
   after:bump:
     - "npm run changelog:update"
-
-# automatic publish from github workflow
-npm:
-  publish: false
-  private: true
-  registry: "OMITTED"
